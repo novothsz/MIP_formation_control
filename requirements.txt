@@ -1,0 +1,10 @@
+matplotlib
+more-itertools
+futures
+autograd
+pyyaml
+scipy
+cvxpy
+cvxopt
+pandas
+gurobipy
