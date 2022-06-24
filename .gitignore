@@ -1,8 +1,4 @@
 .DS_Store/
 *.png
 *.pickle
-*.pdf
-
-*.pickle
-*.pyc
 *.pyc
