@@ -25,3 +25,8 @@ simply run:
 ```
 python3 main.py
 ```
+
+
+<img src="https://github.com/AIMotionLab-SZTAKI/graph_and_MIP_planning/blob/main/doc/fig/payload.pdf" alt="Planning through a narrow corridor" width="500"/>
+
+<img src="https://github.com/AIMotionLab-SZTAKI/graph_and_MIP_planning/blob/main/doc/fig/simulation.gif" alt="Formation control in complex environments" width="500"/>
