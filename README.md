@@ -2,7 +2,7 @@
 
 
 # Purpose
-This repository implements the method described in the work titled "---".
+This repository implements the method described in the work titled "Lightweight Formation Control Algorithm for Fix-Shaped Formations to Avoid Collision".
 
 # Installation
 - install the gurobi solver on your system
