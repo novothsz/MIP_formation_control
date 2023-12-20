@@ -14,7 +14,7 @@ import os
 
 from gurobipy import Model
 from gurobipy import *
-from gurobi import GRB
+from gurobipy import GRB
 from matplotlib.patches import Polygon
 
 

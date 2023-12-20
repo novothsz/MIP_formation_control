@@ -58,7 +58,7 @@ def define_gurobi_spline(model, degree, knot_intervals, n_spl, lower_bound, uppe
         if len(initial_values) > 0:
             for i in range(len(initial_values[k])):
                 coeffs[i].start = initial_values[k][i]
-        splines += [BSpline(basis, np.array(coeffs.values()))]
+        splines += [BSpline(basis, np.array(list(coeffs.values())))]
 
     # print("Starting GUROBI optimization")
     # print("Number of variables: " + str(model.NumVars))

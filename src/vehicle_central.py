@@ -22,7 +22,7 @@ import csv
 
 from gurobipy import Model
 from gurobipy import *
-from gurobi import GRB, quicksum
+from gurobipy import GRB, quicksum
 from matplotlib.patches import Polygon
 
 from .gurobi_spline import define_gurobi_spline, define_constraint

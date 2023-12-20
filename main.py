@@ -1,5 +1,6 @@
 import sys
 sys.path.append('../')
+sys.path.append("/Users/szilard/miniforge3/envs/circular_frenet/lib/python3.12/site-packages")
 import os
 import time
 import argparse
