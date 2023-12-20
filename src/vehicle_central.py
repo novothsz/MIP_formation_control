@@ -140,6 +140,12 @@ class VehicleCentral(VehicleBasis):
             sol_y_t = [zsol_t_[1] for zsol_t_ in zsol_t]
             # if t_idx % 2 == 1 or t_idx == 0:
             #     ax.plot(sol_x_t, sol_y_t, 'k.')
+            import csv
+            data_to_save = [sol_x_t, sol_y_t]
+            file_path = "./coeffs/vehicle_" + str(int(veh_idx)) + "_coeffs.csv"
+            with open(file_path, 'w', newline='') as csvfile:
+                csv_writer = csv.writer(csvfile)
+                csv_writer.writerows(zip(*data_to_save))
             
             
             ax = self.vehicles[0].plot_drone(ax, sol_x_t[0], sol_y_t[0], 0)

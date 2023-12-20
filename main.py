@@ -19,6 +19,7 @@ os.system("mkdir csv")
 os.system("mkdir figures")
 os.system("mkdir video")
 os.system("mkdir yaml")
+os.system("mkdir coeffs")
 
 
 def optimization_loop(stage : int = 0):
