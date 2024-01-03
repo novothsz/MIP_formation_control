@@ -176,6 +176,13 @@ class Obstacle(Environment):
         # polygon = Polygon(corners, closed=True, fill=True, fc=(1,0,0,1), ec=(0,0,0,1), lw=1, zorder = 1)
         ax.add_patch(polygon)
         ax.plot(self.center[0], self.center[1], 'k*')
+
+        import csv
+        data_to_save = self.center + [self.max_dist_from_center]
+        file_path = "./coeffs/obst_" + str(int(self.ID)) + "_coeffs.csv"
+        with open(file_path, 'w', newline='') as csvfile:
+            csv_writer = csv.writer(csvfile)
+            csv_writer.writerow(data_to_save)
       
             
     def cs(self, gamma):
