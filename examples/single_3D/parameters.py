@@ -43,32 +43,35 @@ class QuadrotorProblem:
 
 
 # Parameter setup
-quad_params = QuadrotorParameters(
-    id_r = [0, 1, 2],
-    id_v = [3, 4, 5],
-    id_u = [6, 7, 8],
-    id_sigma = 4,
-    id_t = 1,
-    u_max = 23.2,
-    u_min = 0.6,
-    tilt_max = 60 * np.pi / 180,
-)
-obstacles = [Ellipsoid(H = np.diag([1.0, 1.0, 100.0]), c = np.array([3.0, 3.0, 0.0])),
-            Ellipsoid(H = np.diag([1.0, 1.0, 100.0]), c = np.array([1.1, 3.0, 0.0]))]
-quad_env_params = QuadrotorEnvironmentParameters(
-    g = np.array([0.0, 0.0, -9.81]),
-    obs = obstacles,
-    n_obs = len(obstacles),
-)
+def get_quad_pbm() -> QuadrotorProblem:
+    quad_params = QuadrotorParameters(
+        id_r = [0, 1, 2],
+        id_v = [3, 4, 5],
+        id_u = [0, 1, 2],
+        id_sigma = 4,
+        id_t = 0,
+        u_max = 23.2,
+        u_min = 0.6,
+        tilt_max = 60 * np.pi / 180,
+    )
+    obstacles = [Ellipsoid(H = np.diag([1.0, 1.0, 100.0]), c = np.array([3.0, 3.0, 0.0])),
+                Ellipsoid(H = np.diag([1.0, 1.0, 100.0]), c = np.array([1.1, 3.0, 0.0]))]
+    quad_env_params = QuadrotorEnvironmentParameters(
+        g = np.array([0.0, 0.0, -9.81]).reshape((3, 1)),
+        obs = obstacles,
+        n_obs = len(obstacles),
+    )
 
-traj = QuadrotorTrajectoryParameters(r0 = np.zeros(3),
-                                     rf = np.array([2.5, 6.0, 0.0]),
-                                     v0 = np.zeros(3),
-                                     vf = np.zeros(3),
-                                     tf_min = 0.0,
-                                     tf_max = 2.5,
-                                     gamma = 0.0,)
+    traj = QuadrotorTrajectoryParameters(r0 = np.zeros((3, 1)),
+                                        rf = np.array([2.5, 6.0, 0.0]).reshape((3, 1)),
+                                        v0 = np.zeros((3, 1)),
+                                        vf = np.zeros((3, 1)),
+                                        tf_min = 0.0,
+                                        tf_max = 2.5,
+                                        gamma = 0.0,)
 
-quad_problem = QuadrotorProblem(vehicle = quad_params,
-                                env = quad_env_params,
-                                traj = traj)
+    quad_problem = QuadrotorProblem(vehicle = quad_params,
+                                    env = quad_env_params,
+                                    traj = traj)
+
+    return quad_problem

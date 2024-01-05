@@ -38,28 +38,28 @@ def set_quess(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> Dict[
     g = quad_pbm.env.g
 
     # Parameter guess
-    p = np.zeros((traj_pbm.n_parameters, 1))
+    p = np.zeros((traj_pbm["n_parameters"], 1))
     p[veh.id_t] = 0.5 * (traj.tf_min + traj.tf_max)
 
     # State guess
-    x0 = np.zeros((traj_pbm.n_states, 1))
-    xf = np.zeros((traj_pbm.n_states, 1))
+    x0 = np.zeros((traj_pbm["n_states"], 1))
+    xf = np.zeros((traj_pbm["n_states"], 1))
     x0[veh.id_r] = traj.r0
     xf[veh.id_r] = traj.rf
     x0[veh.id_v] = traj.v0
     xf[veh.id_v] = traj.vf
-    x_init = np.linspace(x0, xf, traj_pbm.n_states).reshape(-1, 1)
+    x_init = np.linspace(x0, xf, traj_pbm["n_states"]).reshape(-1, 1)
     traj_pbm["x_init"] = x_init
 
     # Input guess
-    hover = np.zeros((traj_pbm.n_inputs, 1))
+    hover = np.zeros((traj_pbm["n_inputs"]+1, 1))
     hover[veh.id_u] = -g
-    hover[veh.id_sigma] = np.norm(g)
-    u_init = np.tile(hover, (traj_pbm.n_states, 1))
+    hover[veh.id_sigma] = np.linalg.norm(g)
+    u_init = np.tile(hover, (traj_pbm["n_states"], 1))
     traj_pbm["u_init"] = u_init
 
     # Time guess
-    p_guess = np.zeros((traj_pbm.n_parameters, 1))
+    p_guess = np.zeros((traj_pbm["n_parameters"], 1))
     p_guess[veh.id_t] = 0.5 * (traj.tf_min + traj.tf_max)
     traj_pbm["p_init"] = p_guess
 
@@ -90,6 +90,7 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}):
     uy = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='uy')
     uz = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='uz')
     # sigma = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='sigma')
+
     g = quad_pbm.env.g
 
     # Initial conditions
@@ -129,43 +130,59 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}):
     # model.addConstr(σ * np.cos(veh.tilt_max) - a[3] <= 0, name="max_tilt")
     # TODO: Add constraints for tilt
         
-    # Obstacle constraints
+    # Obstacle avoidance constraints
     for i in range(N):
-        for j in range(quad_env_params.n_obs):
+        for j in range(quad_pbm.env.n_obs):
 
-                    # collision avoidance constraints, inluding rotation of vehicle
-                    # model.addConstr(  (rotation_matrix[0][0] * x[veh_idx](t_) + rotation_matrix[0][1] * y[veh_idx](t_)) - (center_rot[0] + obs_dx) >=  d_obs - R * b[1] )
-                    # model.addConstr( -(rotation_matrix[0][0] * x[veh_idx](t_) + rotation_matrix[0][1] * y[veh_idx](t_)) + (center_rot[0] - obs_dx) >=  d_obs - R * b[0] )
-                    # model.addConstr(  (rotation_matrix[1][0] * x[veh_idx](t_) + rotation_matrix[1][1] * y[veh_idx](t_)) - (center_rot[1] + obs_dy) >=  d_obs - R * b[3] )
-                    # model.addConstr( -(rotation_matrix[1][0] * x[veh_idx](t_) + rotation_matrix[1][1] * y[veh_idx](t_)) + (center_rot[1] - obs_dy) >=  d_obs - R * b[2] )
-                    
-                    
-                    
-                    # model.addConstr(   quicksum(b[q_sum_idx] for q_sum_idx in range(4)) <= 3)
-                    
-                    model.addConstr(  x[i] - obs_dx >=  d_obs - R * b[1] )
-                    model.addConstr(  x[i] + obs_dx >=  d_obs - R * b[0] )
-                    model.addConstr(  y[i] - obs_dy >=  d_obs - R * b[3] )
-                    model.addConstr(  y[i] + obs_dy >=  d_obs - R * b[2] )
+            obs_dx = quad_pbm.env.obs[j].c[0]
+            obs_dy = quad_pbm.env.obs[j].c[1]
+            obs_dz = quad_pbm.env.obs[j].c[2]
+            d_obs = 0.1
+
+            b_avoidance = model.addVars(6, vtype=GRB.BINARY, name='b_avoidance')
+            model.addConstr(  x[i] - obs_dx >=  d_obs - R * b_avoidance[1] )
+            model.addConstr(  x[i] + obs_dx >=  d_obs - R * b_avoidance[0] )
+            model.addConstr(  y[i] - obs_dy >=  d_obs - R * b_avoidance[3] )
+            model.addConstr(  y[i] + obs_dy >=  d_obs - R * b_avoidance[2] )
+            model.addConstr(  z[i] - obs_dz >=  d_obs - R * b_avoidance[5] )
+            model.addConstr(  z[i] + obs_dz >=  d_obs - R * b_avoidance[4] )
+            model.addConstr(   quicksum(b_avoidance[q_sum_idx] for q_sum_idx in range(6)) <= 5)
 
 
     # Minimum time constraint
-                    
+    b_time = model.addVars(N, vtype=GRB.BINARY, name='b_time')
+    for i in range(N):
+        model.addConstr( x[i] - quad_pbm.traj.rf[0] <=  + R * (1 - b_time[i]) )
+        model.addConstr( x[i] - quad_pbm.traj.rf[0] >=  - R * (1 - b_time[i]) )
+        model.addConstr( y[i] - quad_pbm.traj.rf[1] <=  + R * (1 - b_time[i]) )
+        model.addConstr( y[i] - quad_pbm.traj.rf[1] >= - R * (1 - b_time[i]) )
+        model.addConstr( z[i] - quad_pbm.traj.rf[2] <= + R * (1 - b_time[i]) )
+        model.addConstr( z[i] - quad_pbm.traj.rf[2] >= - R * (1 - b_time[i]) )
+        model.addConstr( quicksum(b_time[q_sum_idx] for q_sum_idx in range(N)) == 1 )
 
-                    
+    # Minimum time objective
+    J += quicksum((idx+1) * b_time[q_sum_idx] for idx, q_sum_idx in enumerate(range(N)))
+                 
+    # Minimum energy objective
+    J += quicksum(ux[q_sum_idx] ** 2 + uy[q_sum_idx] ** 2 + uz[q_sum_idx] ** 2 for q_sum_idx in range(N-1))
 
-                    # collision avoidance constraints, without rotation of vehicle
+    model.setObjective(J, GRB.MINIMIZE)
+    model.Params.Threads = 8
+    model.Params.TimeLimit = 200
+    model.Params.NonConvex = 2
+    model.optimize()
+    model.getVars()
+    feasible = True
+    try:   
+        model.getVars()[0].x
+        feasible = True
+    except:
+        feasible = False
+    print(type(model))
+    return model, feasible
 
-
-
-            
-    # # Forward Euler method to calculate the next state
-    # def forward_euler(x: np.ndarray, u: np.ndarray, dt: float, g: np.ndarray) -> np.ndarray:
-    #     return x + dt * (u + g)
-
-    # # Calculate the next state using forward Euler method
-    # x_next = forward_euler(traj_pbm["x_init"], traj_pbm["u_init"], dt=0.1)
-
-    # # Continue with the rest of the code...
-
-    
+class define_problem():
+    quad_pbm = get_quad_pbm()
+    traj_pbm = set_dim()
+    traj_pbm = set_quess(quad_pbm, traj_pbm)
+    model, feasible = create_problem(quad_pbm, traj_pbm)
