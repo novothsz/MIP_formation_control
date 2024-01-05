@@ -1,4 +1,5 @@
 from parameters import *
 from definition import *
 
-model, feasible = define_problem()
+model = define_problem()
+# plot_model(model)

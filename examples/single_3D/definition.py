@@ -67,7 +67,7 @@ def set_quess(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> Dict[
 
 # Now we need to create the MIP problem.
 # We will use Gurobi as the solver.
-def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}):
+def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> Model:
     model = Model("ppl")
     J = 0
     R = 1e5
@@ -113,18 +113,18 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}):
         model.addConstr(x[i+1] == x[i] + vx[i] * dt)
         model.addConstr(y[i+1] == y[i] + vy[i] * dt)
         model.addConstr(z[i+1] == z[i] + vz[i] * dt)
-        model.addConstr(vx[i+1] == vx[i] + (uz[i] + g[0]) * dt)
-        model.addConstr(vy[i+1] == vy[i] + (uz[i] + g[1]) * dt)
+        model.addConstr(vx[i+1] == vx[i] + (ux[i] + g[0]) * dt)
+        model.addConstr(vy[i+1] == vy[i] + (uy[i] + g[1]) * dt)
         model.addConstr(vz[i+1] == vz[i] + (uz[i] + g[2]) * dt)
 
     # Control constraints
     for i in range(N-1):
         model.addConstr(ux[i] <= quad_pbm.vehicle.u_max)
-        model.addConstr(ux[i] >= quad_pbm.vehicle.u_min)
+        # model.addConstr(ux[i] >= quad_pbm.vehicle.u_min)
         model.addConstr(uy[i] <= quad_pbm.vehicle.u_max)
-        model.addConstr(uy[i] >= quad_pbm.vehicle.u_min)
+        # model.addConstr(uy[i] >= quad_pbm.vehicle.u_min)
         model.addConstr(uz[i] <= quad_pbm.vehicle.u_max)
-        model.addConstr(uz[i] >= quad_pbm.vehicle.u_min)
+        # model.addConstr(uz[i] >= quad_pbm.vehicle.u_min)
 
     # Tilt constraints
     # model.addConstr(σ * np.cos(veh.tilt_max) - a[3] <= 0, name="max_tilt")
@@ -137,16 +137,17 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}):
             obs_dx = quad_pbm.env.obs[j].c[0]
             obs_dy = quad_pbm.env.obs[j].c[1]
             obs_dz = quad_pbm.env.obs[j].c[2]
-            d_obs = 0.1
+            d_obs = 1.0
 
             b_avoidance = model.addVars(6, vtype=GRB.BINARY, name='b_avoidance')
             model.addConstr(  x[i] - obs_dx >=  d_obs - R * b_avoidance[1] )
-            model.addConstr(  x[i] + obs_dx >=  d_obs - R * b_avoidance[0] )
+            model.addConstr( -x[i] + obs_dx >=  d_obs - R * b_avoidance[0] )
             model.addConstr(  y[i] - obs_dy >=  d_obs - R * b_avoidance[3] )
-            model.addConstr(  y[i] + obs_dy >=  d_obs - R * b_avoidance[2] )
-            model.addConstr(  z[i] - obs_dz >=  d_obs - R * b_avoidance[5] )
-            model.addConstr(  z[i] + obs_dz >=  d_obs - R * b_avoidance[4] )
-            model.addConstr(   quicksum(b_avoidance[q_sum_idx] for q_sum_idx in range(6)) <= 5)
+            model.addConstr( -y[i] + obs_dy >=  d_obs - R * b_avoidance[2] )
+            # model.addConstr(  z[i] - obs_dz >=  d_obs - R * b_avoidance[5] )
+            # model.addConstr(  z[i] + obs_dz >=  d_obs - R * b_avoidance[4] )
+            # model.addConstr(   quicksum(b_avoidance[q_sum_idx] for q_sum_idx in range(6)) <= 5)
+            model.addConstr(   quicksum(b_avoidance[q_sum_idx] for q_sum_idx in range(4)) <= 3)
 
 
     # Minimum time constraint
@@ -176,13 +177,95 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}):
     try:   
         model.getVars()[0].x
         feasible = True
+        print("Model is feasible")
     except:
         feasible = False
-    print(type(model))
-    return model, feasible
+        print("Model is infeasible")
+    return model
 
-class define_problem():
+def define_problem() -> Model:
     quad_pbm = get_quad_pbm()
     traj_pbm = set_dim()
     traj_pbm = set_quess(quad_pbm, traj_pbm)
-    model, feasible = create_problem(quad_pbm, traj_pbm)
+    model = create_problem(quad_pbm, traj_pbm)
+
+
+    N = 30
+
+    sol_x = []
+    sol_y = []
+    sol_z = []
+    sol_vx = []
+    sol_vy = []
+    sol_vz = []
+    sol_ux = []
+    sol_uy = []
+    sol_uz = []
+
+    solutions = model.getVars()
+    for solution in solutions:
+        if solution.VarName[0:len('x')] == 'x':
+            sol_x += [solution.x]
+        if solution.VarName[0:len('y')] == 'y':
+            sol_y += [solution.x]
+        if solution.VarName[0:len('z')] == 'z':
+            sol_z += [solution.x]
+        if solution.VarName[0:len('vx')] == 'vx':
+            sol_vx += [solution.x]
+        if solution.VarName[0:len('vy')] == 'vy':
+            sol_vy += [solution.x]
+        if solution.VarName[0:len('vz')] == 'vz':
+            sol_vz += [solution.x]
+        if solution.VarName[0:len('ux')] == 'ux':
+            sol_ux += [solution.x]
+        if solution.VarName[0:len('uy')] == 'uy':
+            sol_uy += [solution.x]
+        if solution.VarName[0:len('uz')] == 'uz':
+            sol_uz += [solution.x]
+
+    sol_x = np.array(sol_x).reshape((N, 1))
+    sol_y = np.array(sol_y).reshape((N, 1))
+    sol_z = np.array(sol_z).reshape((N, 1))
+
+    # Plot solution
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+    ax.plot(sol_x, sol_y)
+    ax.plot(sol_x, sol_y, "k.")
+    ax.grid(True) 
+    # Plot the obstacle
+    for obs in quad_pbm.env.obs:
+
+        obs_dx = obs.c[0]
+        obs_dy = obs.c[1]
+        obs_dz = obs.c[2]
+
+        # Square obstacle with poligon
+        from matplotlib.patches import Polygon
+        import matplotlib.patches as patches
+        from matplotlib.lines import Line2D
+
+        r = 1.0
+        corners = np.array([[-r, -r], [-r, r], [r, r], [r, -r]])
+        corners = corners + np.array([obs_dx, obs_dy])
+        polygon = Polygon(corners, closed=True, fill=True, fc=(0,0,1,0.1), ec=(0,0,0,1), ls=':', lw=1, zorder = 2)
+        ax.add_patch(polygon)
+        # Plot center
+        ax.plot(obs_dx, obs_dy, "ro")
+
+        
+    plt.show()
+
+    # Plot z, ux, uy, uz on subplots
+    fig, axs = plt.subplots(2)
+    axs[0].plot(sol_z)
+    axs[0].set_title('z')
+    axs[0].grid(True) 
+    axs[1].plot(sol_ux, label = 'ux')
+    axs[1].plot(sol_uy, label = 'uy')
+    axs[1].plot(sol_uz, label = 'uz')
+    axs[1].legend() 
+    axs[1].grid(True) 
+    plt.show()
+        
+        

@@ -50,8 +50,9 @@ def get_quad_pbm() -> QuadrotorProblem:
         id_u = [0, 1, 2],
         id_sigma = 4,
         id_t = 0,
-        u_max = 23.2,
+        u_max = 1023.2,
         u_min = 0.6,
+        # u_min = -np.inf,
         tilt_max = 60 * np.pi / 180,
     )
     obstacles = [Ellipsoid(H = np.diag([1.0, 1.0, 100.0]), c = np.array([3.0, 3.0, 0.0])),
