@@ -78,8 +78,8 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> 
     sigma = []
     t = []
 
-    N = 30
-    dt = 1 / 30
+    N = 50
+    dt = 1 / N
     x = model.addVars(N, lb=-np.inf, ub=np.inf, name='x')
     y = model.addVars(N, lb=-np.inf, ub=np.inf, name='y')
     z = model.addVars(N, lb=-np.inf, ub=np.inf, name='z')
@@ -190,7 +190,7 @@ def define_problem() -> Model:
     model = create_problem(quad_pbm, traj_pbm)
 
 
-    N = 30
+    N = 50
 
     sol_x = []
     sol_y = []
