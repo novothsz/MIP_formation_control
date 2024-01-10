@@ -88,10 +88,14 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> 
     vx = model.addVars(N, lb=-np.inf, ub=np.inf, name='vx')
     vy = model.addVars(N, lb=-np.inf, ub=np.inf, name='vy')
     vz = model.addVars(N, lb=-np.inf, ub=np.inf, name='vz')
-    ux = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='ux')
-    uy = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='uy')
-    uz = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='uz')
-    sigma = model.addVars(N-1, lb=quad_pbm.vehicle.u_min, ub=quad_pbm.vehicle.u_max, name='sigma')
+    ux = model.addVars(N, lb=-np.inf, ub=np.inf, name='ux')
+    uy = model.addVars(N, lb=-np.inf, ub=np.inf, name='uy')
+    uz = model.addVars(N, lb=-np.inf, ub=np.inf, name='uz')
+    # ux = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='ux')
+    # uy = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='uy')
+    # uz = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='uz')
+    # sigma = model.addVars(N-1, lb=quad_pbm.vehicle.u_min, ub=quad_pbm.vehicle.u_max, name='sigma')
+    sigma = model.addVars(N, lb=quad_pbm.vehicle.u_min, ub=quad_pbm.vehicle.u_max, name='sigma')
 
     g = quad_pbm.env.g
 
@@ -109,6 +113,10 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> 
     model.addConstr(vx[N-1] == quad_pbm.traj.vf[0])
     model.addConstr(vy[N-1] == quad_pbm.traj.vf[1])
     model.addConstr(vz[N-1] == quad_pbm.traj.vf[2])
+    # model.addConstr(ux[N-1] == 0)
+    # model.addConstr(uy[N-1] == 0)
+    # model.addConstr(uz[N-1] == 0)
+    # model.addConstr(sigma[N-1] == 0)
 
     # Dynamics
     for i in range(N-1):
@@ -124,17 +132,21 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> 
         model.addConstr(x[i+1] == x[i] + 0.5 * (vx[i] + vx[i+1]) * dt)
         model.addConstr(y[i+1] == y[i] + 0.5 * (vy[i] + vy[i+1]) * dt)
         model.addConstr(z[i+1] == z[i] + 0.5 * (vz[i] + vz[i+1]) * dt)
-        if i < N-2:
-            model.addConstr(vx[i+1] == vx[i] + 0.5 * ((ux[i] + g[0]) + (ux[i+1] + g[0])) * dt)
-            model.addConstr(vy[i+1] == vy[i] + 0.5 * ((uy[i] + g[1]) + (uy[i+1] + g[1])) * dt)
-            model.addConstr(vz[i+1] == vz[i] + 0.5 * ((uz[i] + g[2]) + (uz[i+1] + g[2])) * dt)
-        else:
-            model.addConstr(vx[i+1] == vx[i] + 0.5 * ((ux[i] + g[0]) + (ux[i] + g[0])) * dt)
-            model.addConstr(vy[i+1] == vy[i] + 0.5 * ((uy[i] + g[1]) + (uy[i] + g[1])) * dt)
-            model.addConstr(vz[i+1] == vz[i] + 0.5 * ((uz[i] + g[2]) + (uz[i] + g[2])) * dt)
+        model.addConstr(vx[i+1] == vx[i] + 0.5 * ((ux[i] + g[0]) + (ux[i+1] + g[0])) * dt)
+        model.addConstr(vy[i+1] == vy[i] + 0.5 * ((uy[i] + g[1]) + (uy[i+1] + g[1])) * dt)
+        model.addConstr(vz[i+1] == vz[i] + 0.5 * ((uz[i] + g[2]) + (uz[i+1] + g[2])) * dt)
+        # if i < N-2:
+        #     model.addConstr(vx[i+1] == vx[i] + 0.5 * ((ux[i] + g[0]) + (ux[i+1] + g[0])) * dt)
+        #     model.addConstr(vy[i+1] == vy[i] + 0.5 * ((uy[i] + g[1]) + (uy[i+1] + g[1])) * dt)
+        #     model.addConstr(vz[i+1] == vz[i] + 0.5 * ((uz[i] + g[2]) + (uz[i+1] + g[2])) * dt)
+        # else:
+        #     model.addConstr(vx[i+1] == vx[i] + 0.5 * ((ux[i] + g[0]) + (ux[i] + g[0])) * dt)
+        #     model.addConstr(vy[i+1] == vy[i] + 0.5 * ((uy[i] + g[1]) + (uy[i] + g[1])) * dt)
+        #     model.addConstr(vz[i+1] == vz[i] + 0.5 * ((uz[i] + g[2]) + (uz[i] + g[2])) * dt)
 
     # Control constraints
-    for i in range(N-1):
+    # for i in range(N-1):
+    for i in range(N):
         # model.addConstr(ux[i] <= quad_pbm.vehicle.u_max)
         # model.addConstr(ux[i] >= quad_pbm.vehicle.u_min)
         # model.addConstr(uy[i] <= quad_pbm.vehicle.u_max)
@@ -187,7 +199,8 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> 
                  
     # Minimum energy objective
     # J += quicksum(ux[q_sum_idx] ** 2 + uy[q_sum_idx] ** 2 + uz[q_sum_idx] ** 2 for q_sum_idx in range(N-1))
-    J += (1.0 - gamma) * quicksum((sigma[i] / np.linalg.norm(g)) ** 2 for i in range(N-1))
+    # J += (1.0 - gamma) * quicksum((sigma[i] / np.linalg.norm(g)) ** 2 for i in range(N-1))
+    J += (1.0 - gamma) * quicksum((sigma[i] / np.linalg.norm(g)) ** 2 for i in range(N))
     
     # Minimum time objective
     # J += quicksum((idx+1) * b_time[q_sum_idx] for idx, q_sum_idx in enumerate(range(N)))
