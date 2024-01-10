@@ -71,25 +71,27 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> 
     model = Model("ppl")
     J = 0
     R = 1e5
-
-    x, y, z = [], [], []
-    vx, vy, vz = [], [], []
-    ux, uy, uz = [], [], []
-    sigma = []
-    t = []
+    gamma = quad_pbm.traj.gamma
 
     N = 50
-    dt = 1 / N
+    dt = quad_pbm.traj.tf_max/N
+
+    z_min = 0
+    z_max = 0
+
+    # Total time
+    T = model.addVar(lb=0.0, ub=quad_pbm.traj.tf_max , name='T')
+
     x = model.addVars(N, lb=-np.inf, ub=np.inf, name='x')
     y = model.addVars(N, lb=-np.inf, ub=np.inf, name='y')
-    z = model.addVars(N, lb=-np.inf, ub=np.inf, name='z')
+    z = model.addVars(N, lb=z_min, ub=z_max, name='z')
     vx = model.addVars(N, lb=-np.inf, ub=np.inf, name='vx')
     vy = model.addVars(N, lb=-np.inf, ub=np.inf, name='vy')
     vz = model.addVars(N, lb=-np.inf, ub=np.inf, name='vz')
     ux = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='ux')
     uy = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='uy')
     uz = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='uz')
-    # sigma = model.addVars(N-1, lb=-np.inf, ub=np.inf, name='sigma')
+    sigma = model.addVars(N-1, lb=quad_pbm.vehicle.u_min, ub=quad_pbm.vehicle.u_max, name='sigma')
 
     g = quad_pbm.env.g
 
@@ -110,25 +112,43 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> 
 
     # Dynamics
     for i in range(N-1):
-        model.addConstr(x[i+1] == x[i] + vx[i] * dt)
-        model.addConstr(y[i+1] == y[i] + vy[i] * dt)
-        model.addConstr(z[i+1] == z[i] + vz[i] * dt)
-        model.addConstr(vx[i+1] == vx[i] + (ux[i] + g[0]) * dt)
-        model.addConstr(vy[i+1] == vy[i] + (uy[i] + g[1]) * dt)
-        model.addConstr(vz[i+1] == vz[i] + (uz[i] + g[2]) * dt)
+        # Dynamics with Euler
+        # model.addConstr(x[i+1] == x[i] + vx[i] * dt)
+        # model.addConstr(y[i+1] == y[i] + vy[i] * dt)
+        # model.addConstr(z[i+1] == z[i] + vz[i] * dt)
+        # model.addConstr(vx[i+1] == vx[i] + (ux[i] + g[0]) * dt)
+        # model.addConstr(vy[i+1] == vy[i] + (uy[i] + g[1]) * dt)
+        # model.addConstr(vz[i+1] == vz[i] + (uz[i] + g[2]) * dt)
+
+        # Dynamics with FOH
+        model.addConstr(x[i+1] == x[i] + 0.5 * (vx[i] + vx[i+1]) * dt)
+        model.addConstr(y[i+1] == y[i] + 0.5 * (vy[i] + vy[i+1]) * dt)
+        model.addConstr(z[i+1] == z[i] + 0.5 * (vz[i] + vz[i+1]) * dt)
+        if i < N-2:
+            model.addConstr(vx[i+1] == vx[i] + 0.5 * ((ux[i] + g[0]) + (ux[i+1] + g[0])) * dt)
+            model.addConstr(vy[i+1] == vy[i] + 0.5 * ((uy[i] + g[1]) + (uy[i+1] + g[1])) * dt)
+            model.addConstr(vz[i+1] == vz[i] + 0.5 * ((uz[i] + g[2]) + (uz[i+1] + g[2])) * dt)
+        else:
+            model.addConstr(vx[i+1] == vx[i] + 0.5 * ((ux[i] + g[0]) + (ux[i] + g[0])) * dt)
+            model.addConstr(vy[i+1] == vy[i] + 0.5 * ((uy[i] + g[1]) + (uy[i] + g[1])) * dt)
+            model.addConstr(vz[i+1] == vz[i] + 0.5 * ((uz[i] + g[2]) + (uz[i] + g[2])) * dt)
 
     # Control constraints
     for i in range(N-1):
-        model.addConstr(ux[i] <= quad_pbm.vehicle.u_max)
+        # model.addConstr(ux[i] <= quad_pbm.vehicle.u_max)
         # model.addConstr(ux[i] >= quad_pbm.vehicle.u_min)
-        model.addConstr(uy[i] <= quad_pbm.vehicle.u_max)
+        # model.addConstr(uy[i] <= quad_pbm.vehicle.u_max)
         # model.addConstr(uy[i] >= quad_pbm.vehicle.u_min)
-        model.addConstr(uz[i] <= quad_pbm.vehicle.u_max)
+        # model.addConstr(uz[i] <= quad_pbm.vehicle.u_max)
         # model.addConstr(uz[i] >= quad_pbm.vehicle.u_min)
 
-    # Tilt constraints
-    # model.addConstr(σ * np.cos(veh.tilt_max) - a[3] <= 0, name="max_tilt")
-    # TODO: Add constraints for tilt
+        # norm(a) <= sigma
+        model.addConstr((ux[i] ** 2) + (uy[i] ** 2) + (uz[i] ** 2) <= sigma[i]**2)
+        # Max tilt
+        model.addConstr(sigma[i] * np.cos(quad_pbm.vehicle.tilt_max) - uz[i] <= 0, name="max_tilt")
+
+
+
         
     # Obstacle avoidance constraints
     for i in range(N):
@@ -144,13 +164,13 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> 
             model.addConstr( -x[i] + obs_dx >=  d_obs - R * b_avoidance[0] )
             model.addConstr(  y[i] - obs_dy >=  d_obs - R * b_avoidance[3] )
             model.addConstr( -y[i] + obs_dy >=  d_obs - R * b_avoidance[2] )
-            # model.addConstr(  z[i] - obs_dz >=  d_obs - R * b_avoidance[5] )
-            # model.addConstr(  z[i] + obs_dz >=  d_obs - R * b_avoidance[4] )
-            # model.addConstr(   quicksum(b_avoidance[q_sum_idx] for q_sum_idx in range(6)) <= 5)
-            model.addConstr(   quicksum(b_avoidance[q_sum_idx] for q_sum_idx in range(4)) <= 3)
+            # model.addConstr(   quicksum(b_avoidance[q_sum_idx] for q_sum_idx in range(4)) <= 3)
+            model.addConstr(  z[i] - obs_dz >=  d_obs - R * b_avoidance[5] )
+            model.addConstr(  z[i] + obs_dz >=  d_obs - R * b_avoidance[4] )
+            model.addConstr(   quicksum(b_avoidance[q_sum_idx] for q_sum_idx in range(6)) <= 5)
 
 
-    # Minimum time constraint
+    # Final state constraint
     b_time = model.addVars(N, vtype=GRB.BINARY, name='b_time')
     for i in range(N):
         model.addConstr( x[i] - quad_pbm.traj.rf[0] <=  + R * (1 - b_time[i]) )
@@ -161,11 +181,19 @@ def create_problem(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> 
         model.addConstr( z[i] - quad_pbm.traj.rf[2] >= - R * (1 - b_time[i]) )
         model.addConstr( quicksum(b_time[q_sum_idx] for q_sum_idx in range(N)) == 1 )
 
-    # Minimum time objective
-    J += quicksum((idx+1) * b_time[q_sum_idx] for idx, q_sum_idx in enumerate(range(N)))
+    # Time constraint
+    model.addConstrs((T >= b_time[i] * dt for i in range(N)))
+    model.addConstrs((b_time[i-1] - b_time[i] <= 0 for i in range(1, N)))
                  
     # Minimum energy objective
-    J += quicksum(ux[q_sum_idx] ** 2 + uy[q_sum_idx] ** 2 + uz[q_sum_idx] ** 2 for q_sum_idx in range(N-1))
+    # J += quicksum(ux[q_sum_idx] ** 2 + uy[q_sum_idx] ** 2 + uz[q_sum_idx] ** 2 for q_sum_idx in range(N-1))
+    J += (1.0 - gamma) * quicksum((sigma[i] / np.linalg.norm(g)) ** 2 for i in range(N-1))
+    
+    # Minimum time objective
+    # J += quicksum((idx+1) * b_time[q_sum_idx] for idx, q_sum_idx in enumerate(range(N)))
+    # Terminal cost
+    J += gamma * (T / quad_pbm.traj.tf_max)**2
+
 
     model.setObjective(J, GRB.MINIMIZE)
     model.Params.Threads = 8
@@ -201,6 +229,8 @@ def define_problem() -> Model:
     sol_ux = []
     sol_uy = []
     sol_uz = []
+    sol_sigma = []
+    sol_T = []
 
     solutions = model.getVars()
     for solution in solutions:
@@ -222,6 +252,10 @@ def define_problem() -> Model:
             sol_uy += [solution.x]
         if solution.VarName[0:len('uz')] == 'uz':
             sol_uz += [solution.x]
+        if solution.VarName[0:len('sigma')] == 'sigma':
+            sol_sigma += [solution.x]
+        if solution.VarName[0:len('T')] == 'T':
+            sol_T = solution.x
 
     sol_x = np.array(sol_x).reshape((N, 1))
     sol_y = np.array(sol_y).reshape((N, 1))
@@ -252,20 +286,27 @@ def define_problem() -> Model:
         ax.add_patch(polygon)
         # Plot center
         ax.plot(obs_dx, obs_dy, "ro")
+    
 
-        
+    ax.set_title(f'Minimum time trajectory. Minimum time: {sol_T}\n Optimization time: {model.Runtime:.2f}')
+    fig.savefig("../AIConvexification.jl/plots/MIP_drone_trajectory.png")
     plt.show()
 
-    # Plot z, ux, uy, uz on subplots
-    fig, axs = plt.subplots(2)
-    axs[0].plot(sol_z)
-    axs[0].set_title('z')
+    # Plot z, ux, uy, uz, sigma on subplots
+    fig, axs = plt.subplots(3)
+    axs[0].plot(sol_ux, label = 'ux')
+    axs[0].plot(sol_uy, label = 'uy')
+    axs[0].plot(sol_uz, label = 'uz')
     axs[0].grid(True) 
-    axs[1].plot(sol_ux, label = 'ux')
-    axs[1].plot(sol_uy, label = 'uy')
-    axs[1].plot(sol_uz, label = 'uz')
+    axs[1].plot(sol_sigma, label = 'sigma')
     axs[1].legend() 
+    axs[1].set_title('sigma')
     axs[1].grid(True) 
+    axs[2].plot(sol_z)
+    axs[2].set_title('z')
+    axs[2].grid(True) 
+    fig.savefig("../AIConvexification.jl/plots/MIP_drone_inputs.png")
     plt.show()
+
         
         
