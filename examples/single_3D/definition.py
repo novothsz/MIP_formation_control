@@ -2,6 +2,7 @@ from typing import Any, Dict, List
 from dataclasses import dataclass
 import numpy as np
 from parameters import *
+from data import Environment, Solution
 
 from gurobipy import Model
 from gurobipy import *
@@ -33,8 +34,8 @@ def set_quess(quad_pbm:QuadrotorProblem, traj_pbm: Dict[str, Any] = {}) -> Dict[
     p[veh.id_t] = 0.5 * (traj.tf_min + traj.tf_max)
 
     # State guess
-    x0 = np.zeros((traj_pbm["n_states"], 1))
-    xf = np.zeros((traj_pbm["n_states"], 1))
+    x0 = np.zeros((traj_pbm["n_states"],))
+    xf = np.zeros((traj_pbm["n_states"],))
     x0[veh.id_r] = traj.r0
     xf[veh.id_r] = traj.rf
     x0[veh.id_v] = traj.v0
@@ -62,9 +63,11 @@ class TrajectoryProblem():
     model: Model
     quad_pbm: QuadrotorProblem
     traj_pbm: Dict[str, Any]
-    def __init__(self):
+    N: int
+    def __init__(self, env:Environment):
+        self.N = 50
         self.model = Model("ppl")
-        self.quad_pbm = get_quad_pbm()
+        self.quad_pbm = get_quad_pbm(r0=env.start_pos[0], rf=env.end_pos[0], obstacles=env.obstacles)
         self.traj_pbm = set_dim()
         self.traj_pbm = set_quess(self.quad_pbm, self.traj_pbm)
     
@@ -79,7 +82,7 @@ class TrajectoryProblem():
         R = 1e5
         gamma = quad_pbm.traj.gamma
 
-        N = 50
+        N = self.N
         dt = quad_pbm.traj.tf_max/N
 
         z_min = 0
@@ -232,13 +235,12 @@ class TrajectoryProblem():
         self.model = model
         return None
 
+    def get_solution(self,) -> List[np.ndarray]:
 
-    def plot_model(self,) -> None:
-
-        N = 50
+        N = self.N
         model = self.model
-        quad_pbm = self.quad_pbm
-        traj_pbm = self.traj_pbm
+
+        feasible: bool = True
 
         sol_x = []
         sol_y = []
@@ -252,42 +254,79 @@ class TrajectoryProblem():
         sol_sigma = []
         sol_T = []
 
-        solutions = model.getVars()
-        for solution in solutions:
-            if solution.VarName[0:len('x')] == 'x':
-                sol_x += [solution.x]
-            if solution.VarName[0:len('y')] == 'y':
-                sol_y += [solution.x]
-            if solution.VarName[0:len('z')] == 'z':
-                sol_z += [solution.x]
-            if solution.VarName[0:len('vx')] == 'vx':
-                sol_vx += [solution.x]
-            if solution.VarName[0:len('vy')] == 'vy':
-                sol_vy += [solution.x]
-            if solution.VarName[0:len('vz')] == 'vz':
-                sol_vz += [solution.x]
-            if solution.VarName[0:len('ux')] == 'ux':
-                sol_ux += [solution.x]
-            if solution.VarName[0:len('uy')] == 'uy':
-                sol_uy += [solution.x]
-            if solution.VarName[0:len('uz')] == 'uz':
-                sol_uz += [solution.x]
-            if solution.VarName[0:len('sigma')] == 'sigma':
-                sol_sigma += [solution.x]
-            if solution.VarName[0:len('T')] == 'T':
-                sol_T = solution.x
+        try:
+            solutions = model.getVars()
+            for solution in solutions:
+                if solution.VarName[0:len('x')] == 'x':
+                    sol_x += [solution.x]
+                if solution.VarName[0:len('y')] == 'y':
+                    sol_y += [solution.x]
+                if solution.VarName[0:len('z')] == 'z':
+                    sol_z += [solution.x]
+                if solution.VarName[0:len('vx')] == 'vx':
+                    sol_vx += [solution.x]
+                if solution.VarName[0:len('vy')] == 'vy':
+                    sol_vy += [solution.x]
+                if solution.VarName[0:len('vz')] == 'vz':
+                    sol_vz += [solution.x]
+                if solution.VarName[0:len('ux')] == 'ux':
+                    sol_ux += [solution.x]
+                if solution.VarName[0:len('uy')] == 'uy':
+                    sol_uy += [solution.x]
+                if solution.VarName[0:len('uz')] == 'uz':
+                    sol_uz += [solution.x]
+                if solution.VarName[0:len('sigma')] == 'sigma':
+                    sol_sigma += [solution.x]
+                if solution.VarName[0:len('T')] == 'T':
+                    sol_T = solution.x
 
-        sol_x = np.array(sol_x).reshape((N, 1))
-        sol_y = np.array(sol_y).reshape((N, 1))
-        sol_z = np.array(sol_z).reshape((N, 1))
+            sol_x = np.array(sol_x).reshape((N, 1))
+            sol_y = np.array(sol_y).reshape((N, 1))
+            sol_z = np.array(sol_z).reshape((N, 1))
+        except:
+            sol_x = np.zeros((N, 1))
+            sol_y = np.zeros((N, 1))
+            sol_z = np.zeros((N, 1))
+            sol_ux = np.zeros((N, 1))
+            sol_uy = np.zeros((N, 1))
+            sol_uz = np.zeros((N, 1))
+            sol_sigma = np.zeros((N, 1))
+            sol_T = 0.0
+            feasible = False
 
+        solution = Solution(x = sol_x, y = sol_y, z = sol_z, ux = sol_ux, uy = sol_uy, uz = sol_uz, sigma = sol_sigma, T = sol_T, optimisation_time = model.Runtime, feasible = feasible)
+
+        return solution
+
+    def plot_solution(self,env: Environment) -> List[np.ndarray]:
+
+        obstacles = env.obstacles
+        r0 = env.start_pos[0]
+        rf = env.end_pos[0]
+
+        sol_x = env.solution.x
+        sol_y = env.solution.y
+        sol_z = env.solution.z
+        sol_ux = env.solution.ux
+        sol_uy = env.solution.uy
+        sol_uz = env.solution.uz
+        sol_sigma = env.solution.sigma
+        sol_T = env.solution.T
+        optimisation_time = env.solution.optimisation_time
+
+        
+        
         # Plot solution
         fig, ax = plt.subplots()
+
+        ax.plot(r0[0], r0[1], "go")
+        ax.plot(rf[0], rf[1], "ro")
+
         ax.plot(sol_x, sol_y)
         ax.plot(sol_x, sol_y, "k.")
         ax.grid(True) 
         # Plot the obstacle
-        for obs in quad_pbm.env.obs:
+        for obs in obstacles:
 
             obs_dx = obs.c[0]
             obs_dy = obs.c[1]
@@ -304,10 +343,10 @@ class TrajectoryProblem():
             polygon = Polygon(corners, closed=True, fill=True, fc=(0,0,1,0.1), ec=(0,0,0,1), ls=':', lw=1, zorder = 2)
             ax.add_patch(polygon)
             # Plot center
-            ax.plot(obs_dx, obs_dy, "ro")
+            ax.plot(obs_dx, obs_dy, "bo")
         
 
-        ax.set_title(f'Minimum time trajectory. Minimum time: {sol_T}\n Optimization time: {model.Runtime:.2f}')
+        ax.set_title(f'Minimum time trajectory. Minimum time: {sol_T}\n Optimization time: {optimisation_time:.2f}')
         fig.savefig("../AIConvexification.jl/plots/MIP_drone_trajectory.png")
         plt.show()
 
@@ -327,6 +366,6 @@ class TrajectoryProblem():
         fig.savefig("../AIConvexification.jl/plots/MIP_drone_inputs.png")
         plt.show()
 
-        return None
+        return 
             
             
