@@ -1,5 +1,6 @@
 from parameters import *
 from definition import *
 
-model = define_problem()
-# plot_model(model)
+tp = TrajectoryProblem()
+tp.create_problem()
+tp.plot_model()
