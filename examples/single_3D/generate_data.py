@@ -5,10 +5,9 @@ from definition import *
 from data import Environment, Solution
 from typing import List, Optional
 from definition import Ellipsoid
-import pickle
+import json
 import os
 
-# 5523.57
 
 def generate_obstacles(env: Environment, n_obs:int) -> List[Ellipsoid]:
 
@@ -60,20 +59,21 @@ def generate_environment(n_obs:int) -> Environment:
     return env
 
 
-# If possible, load pickled environment
+# If possible, load json environment
 def main(n_data:int=0, plot_solution:bool=False, load_environment:bool=False, env_id:Optional[int]=None):
     
     if load_environment:
         if env_id is None:
             env_id = 0
-            # Pickle the last environment in the folder
-            while os.path.exists(f"../AIConvexification.jl/data/{env_id}.pickle"):
+            # Load the last environment in the folder
+            while os.path.exists(f"../AIConvexification.jl/data/{env_id}.json"):
                 env_id += 1
         else:
             env_id += 1
-        # open the last pickle file
-        with open(f"../AIConvexification.jl/data/{env_id-1}.pickle", 'rb') as f:
-            environment = pickle.load(f)
+        # Open the last json file
+        with open(f"../AIConvexification.jl/data/{env_id-1}.json", 'r') as f:
+            environment_dict = json.load(f)
+            environment: Environment = Environment.from_dict(environment_dict)
 
         tp=TrajectoryProblem(env=environment)
         solution: Solution = environment.solution
@@ -86,15 +86,15 @@ def main(n_data:int=0, plot_solution:bool=False, load_environment:bool=False, en
             solution: Solution
             solution=tp.get_solution()
 
-            environment.solution=solution
-            # Pickle environment
-            # read files in the folder (filenames are: {integer}.pickle)
-            # then, write new file, names: {max_integer+1}.pickle
+            environment.solution=[solution]
+            # Load environment
+            # read files in the folder (filenames are: {integer}.json)
+            # then, write new file, names: {max_integer+1}.json
             i:int = 0 if env_id is None else env_id # starts at env_id if available 
-            while os.path.exists(f"../AIConvexification.jl/data/{i}.pickle"):
+            while os.path.exists(f"../AIConvexification.jl/data/{i}.json"):
                 i+=1
-            with open(f"../AIConvexification.jl/data/{i}.pickle", 'wb') as f:
-                pickle.dump(environment, f)
+            with open(f"../AIConvexification.jl/data/{i}.json", 'w') as f:
+                json.dump(environment.to_dict(), f)
     if plot_solution:
         tp.plot_solution(env=environment)
 
@@ -106,14 +106,15 @@ def plot_statistics() -> None:
     n_failed = 0
     n_straight_traj = 0
     costs:List[float] = []
-    while os.path.exists(f"../AIConvexification.jl/data/{env_id}.pickle"):
-        with open(f"../AIConvexification.jl/data/{env_id}.pickle", 'rb') as f:
-            environment: Environment = pickle.load(f)
-            if environment.solution.feasible == False:
+    while os.path.exists(f"../AIConvexification.jl/data/{env_id}.json"):
+        with open(f"../AIConvexification.jl/data/{env_id}.json", 'r') as f:
+            environment_dict = json.load(f)
+            environment: Environment = Environment.from_dict(environment_dict)
+            if environment.solution[0].feasible == False:
                 n_failed += 1
-            if 5523.569 <= environment.solution.cost <= 5523.571:
+            if 5523.569 <= environment.solution[0].cost <= 5523.571:
                 n_straight_traj += 1
-            costs += [environment.solution.cost]
+            costs += [environment.solution[0].cost]
             n_envs += 1
         env_id += 1
     
@@ -131,5 +132,5 @@ def plot_statistics() -> None:
 
 
 if __name__ == "__main__":
-    main(n_data=10, plot_solution=False, load_environment=False, env_id=None)
-    # plot_statistics()
+    # main(n_data=10, plot_solution=True, load_environment=True, env_id=2)
+    plot_statistics()

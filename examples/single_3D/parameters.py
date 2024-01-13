@@ -7,6 +7,19 @@ class Ellipsoid:
     H:np.ndarray
     c:np.ndarray
 
+    def to_dict(self):
+        return {
+            "H": self.H.tolist(),
+            "c": self.c.tolist(),
+        }
+    
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            H=np.array(data["H"]),
+            c=np.array(data["c"]),
+        )
+
 @dataclass
 class QuadrotorParameters:
     id_r: List[int]

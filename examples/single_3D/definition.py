@@ -255,7 +255,7 @@ class TrajectoryProblem():
         sol_uy = []
         sol_uz = []
         sol_sigma = []
-        sol_T = []
+        sol_T: float
 
         try:
             solutions = model.getVars()
@@ -283,17 +283,22 @@ class TrajectoryProblem():
                 if solution.VarName[0:len('T')] == 'T':
                     sol_T = solution.x
 
-            sol_x = np.array(sol_x).reshape((N, 1))
-            sol_y = np.array(sol_y).reshape((N, 1))
-            sol_z = np.array(sol_z).reshape((N, 1))
+            sol_x = np.array(sol_x).reshape((N,))
+            sol_y = np.array(sol_y).reshape((N,))
+            sol_z = np.array(sol_z).reshape((N,))
+            sol_ux = np.array(sol_ux).reshape((N,))
+            sol_uy = np.array(sol_uy).reshape((N,))
+            sol_uz = np.array(sol_uz).reshape((N,))
+            sol_sigma = np.array(sol_sigma).reshape((N,))
+
         except:
-            sol_x = np.zeros((N, 1))
-            sol_y = np.zeros((N, 1))
-            sol_z = np.zeros((N, 1))
-            sol_ux = np.zeros((N, 1))
-            sol_uy = np.zeros((N, 1))
-            sol_uz = np.zeros((N, 1))
-            sol_sigma = np.zeros((N, 1))
+            sol_x = np.zeros((N,))
+            sol_y = np.zeros((N,))
+            sol_z = np.zeros((N,))
+            sol_ux = np.zeros((N,))
+            sol_uy = np.zeros((N,))
+            sol_uz = np.zeros((N,))
+            sol_sigma = np.zeros((N,))
             sol_T = 0.0
             feasible = False
 
@@ -308,16 +313,16 @@ class TrajectoryProblem():
         r0 = env.start_pos[0]
         rf = env.end_pos[0]
 
-        sol_x = env.solution.x
-        sol_y = env.solution.y
-        sol_z = env.solution.z
-        sol_ux = env.solution.ux
-        sol_uy = env.solution.uy
-        sol_uz = env.solution.uz
-        sol_sigma = env.solution.sigma
-        sol_T = env.solution.T
-        optimisation_time = env.solution.optimisation_time
-        cost = env.solution.cost
+        sol_x = env.solution[0].x
+        sol_y = env.solution[0].y
+        sol_z = env.solution[0].z
+        sol_ux = env.solution[0].ux
+        sol_uy = env.solution[0].uy
+        sol_uz = env.solution[0].uz
+        sol_sigma = env.solution[0].sigma
+        sol_T = env.solution[0].T
+        optimisation_time = env.solution[0].optimisation_time
+        cost = env.solution[0].cost
 
         
         
