@@ -14,6 +14,7 @@ class Solution:
     sigma: np.ndarray
     T: float
     optimisation_time: float
+    cost: float
     feasible: bool
 
 @dataclass

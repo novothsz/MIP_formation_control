@@ -3,10 +3,12 @@
 from parameters import *
 from definition import *
 from data import Environment, Solution
-from typing import List
+from typing import List, Optional
 from definition import Ellipsoid
 import pickle
 import os
+
+# 5523.57
 
 def generate_obstacles(env: Environment, n_obs:int) -> List[Ellipsoid]:
 
@@ -59,36 +61,75 @@ def generate_environment(n_obs:int) -> Environment:
 
 
 # If possible, load pickled environment
-load_environment=True
-if load_environment:
-    # Pickle the last environment in the folder
-    i = 0
-    while os.path.exists(f"../AIConvexification.jl/data/{i}.pickle"):
-        i += 1
-    # open the last pickle file
-    with open(f"../AIConvexification.jl/data/{i-1}.pickle", 'rb') as f:
-        environment = pickle.load(f)
+def main(n_data:int=0, plot_solution:bool=False, load_environment:bool=False, env_id:Optional[int]=None):
+    
+    if load_environment:
+        if env_id is None:
+            env_id = 0
+            # Pickle the last environment in the folder
+            while os.path.exists(f"../AIConvexification.jl/data/{env_id}.pickle"):
+                env_id += 1
+        else:
+            env_id += 1
+        # open the last pickle file
+        with open(f"../AIConvexification.jl/data/{env_id-1}.pickle", 'rb') as f:
+            environment = pickle.load(f)
 
-    tp=TrajectoryProblem(env=environment)
-    solution: Solution = environment.solution
+        tp=TrajectoryProblem(env=environment)
+        solution: Solution = environment.solution
 
-else:
-    environment: Environment=generate_environment(2)
-    tp=TrajectoryProblem(env=environment)
-    tp.create_problem()
-    solution: Solution
-    solution=tp.get_solution()
+    else:
+        for i in range(n_data):
+            environment: Environment=generate_environment(2)
+            tp=TrajectoryProblem(env=environment)
+            tp.create_problem()
+            solution: Solution
+            solution=tp.get_solution()
 
-    environment.solution=solution
-    # Pickle environment
-    # read files in the folder (filenames are: {integer}.pickle)
-    # then, write new file, names: {max_integer+1}.pickle
-    i=0
-    while os.path.exists(f"../AIConvexification.jl/data/{i}.pickle"):
-        i+=1
-    with open(f"../AIConvexification.jl/data/{i}.pickle", 'wb') as f:
-        pickle.dump(environment, f)
+            environment.solution=solution
+            # Pickle environment
+            # read files in the folder (filenames are: {integer}.pickle)
+            # then, write new file, names: {max_integer+1}.pickle
+            i:int = 0 if env_id is None else env_id # starts at env_id if available 
+            while os.path.exists(f"../AIConvexification.jl/data/{i}.pickle"):
+                i+=1
+            with open(f"../AIConvexification.jl/data/{i}.pickle", 'wb') as f:
+                pickle.dump(environment, f)
+    if plot_solution:
+        tp.plot_solution(env=environment)
+
+def plot_statistics() -> None:
+
+    # Check how many environments failed
+    env_id = 0
+    n_envs = 0
+    n_failed = 0
+    n_straight_traj = 0
+    costs:List[float] = []
+    while os.path.exists(f"../AIConvexification.jl/data/{env_id}.pickle"):
+        with open(f"../AIConvexification.jl/data/{env_id}.pickle", 'rb') as f:
+            environment: Environment = pickle.load(f)
+            if environment.solution.feasible == False:
+                n_failed += 1
+            if 5523.569 <= environment.solution.cost <= 5523.571:
+                n_straight_traj += 1
+            costs += [environment.solution.cost]
+            n_envs += 1
+        env_id += 1
+    
+    # Make the y axis logarithmic
+    # Histogram of costs
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots()
+    ax.hist(costs, bins=100)
+    ax.set_yscale('log')
+    ax.grid(True)
+    ax.set_xlabel("Cost")
+    ax.set_ylabel("Frequency")
+    ax.set_title(f"Histogram of costs.\n{len(costs)} environments, {n_failed} failed, {n_straight_traj} straight trajectories")
+    plt.show()
 
 
-tp.plot_solution(env=environment)
-
+if __name__ == "__main__":
+    main(n_data=10, plot_solution=False, load_environment=False, env_id=None)
+    # plot_statistics()

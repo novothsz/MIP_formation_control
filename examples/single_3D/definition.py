@@ -162,11 +162,13 @@ class TrajectoryProblem():
             # model.addConstr(uy[i] >= quad_pbm.vehicle.u_min)
             # model.addConstr(uz[i] <= quad_pbm.vehicle.u_max)
             # model.addConstr(uz[i] >= quad_pbm.vehicle.u_min)
+            model.addConstr((ux[i] ** 2) + (uy[i] ** 2) + (uz[i] ** 2) <= quad_pbm.vehicle.u_max**2)
+            # model.addConstr((ux[i] ** 2) + (uy[i] ** 2) + (uz[i] ** 2) >= quad_pbm.vehicle.u_min**2)
 
             # norm(a) <= sigma
-            model.addConstr((ux[i] ** 2) + (uy[i] ** 2) + (uz[i] ** 2) <= sigma[i]**2)
+            # model.addConstr((ux[i] ** 2) + (uy[i] ** 2) + (uz[i] ** 2) <= sigma[i]**2)
             # Max tilt
-            model.addConstr(sigma[i] * np.cos(quad_pbm.vehicle.tilt_max) - uz[i] <= 0, name="max_tilt")
+            # model.addConstr(sigma[i] * np.cos(quad_pbm.vehicle.tilt_max) - uz[i] <= 0, name="max_tilt")
 
 
 
@@ -210,6 +212,7 @@ class TrajectoryProblem():
         # J += quicksum(ux[q_sum_idx] ** 2 + uy[q_sum_idx] ** 2 + uz[q_sum_idx] ** 2 for q_sum_idx in range(N-1))
         # J += (1.0 - gamma) * quicksum((sigma[i] / np.linalg.norm(g)) ** 2 for i in range(N-1))
         J += (1.0 - gamma) * quicksum((sigma[i] / np.linalg.norm(g)) ** 2 for i in range(N))
+        J += quicksum(ux[q_sum_idx] ** 2 + uy[q_sum_idx] ** 2 + uz[q_sum_idx] ** 2 for q_sum_idx in range(N))
         
         # Minimum time objective
         # J += quicksum((idx+1) * b_time[q_sum_idx] for idx, q_sum_idx in enumerate(range(N)))
@@ -223,7 +226,7 @@ class TrajectoryProblem():
         model.Params.NonConvex = 2
         model.optimize()
         model.getVars()
-        feasible = True
+        feasible: bool
         try:   
             model.getVars()[0].x
             feasible = True
@@ -294,7 +297,8 @@ class TrajectoryProblem():
             sol_T = 0.0
             feasible = False
 
-        solution = Solution(x = sol_x, y = sol_y, z = sol_z, ux = sol_ux, uy = sol_uy, uz = sol_uz, sigma = sol_sigma, T = sol_T, optimisation_time = model.Runtime, feasible = feasible)
+        # model.getObjective().getValue()
+        solution = Solution(x = sol_x, y = sol_y, z = sol_z, ux = sol_ux, uy = sol_uy, uz = sol_uz, sigma = sol_sigma, T = sol_T, optimisation_time = model.Runtime, cost = model.ObjVal, feasible = feasible)
 
         return solution
 
@@ -313,6 +317,7 @@ class TrajectoryProblem():
         sol_sigma = env.solution.sigma
         sol_T = env.solution.T
         optimisation_time = env.solution.optimisation_time
+        cost = env.solution.cost
 
         
         
@@ -346,7 +351,7 @@ class TrajectoryProblem():
             ax.plot(obs_dx, obs_dy, "bo")
         
 
-        ax.set_title(f'Minimum time trajectory. Minimum time: {sol_T}\n Optimization time: {optimisation_time:.2f}')
+        ax.set_title(f'Minimum time trajectory. Minimum time: {sol_T}\n Optimization time: {optimisation_time:.2f} \n Cost: {cost:.2f}')
         fig.savefig("../AIConvexification.jl/plots/MIP_drone_trajectory.png")
         plt.show()
 
